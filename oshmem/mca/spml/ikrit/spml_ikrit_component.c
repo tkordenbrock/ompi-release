@@ -93,6 +93,12 @@ static inline int set_mxm_tls()
 {
     char *tls;
 
+    /* disable dci pull for rdma ops. Use single pool.
+     * Pool size is controlled by MXM_DC_QP_LIMIT 
+     * variable
+     */
+    opal_setenv("MXM_OSHMEM_DC_RNDV_QP_LIMIT", "0", 0, &environ);
+
     tls = getenv("MXM_OSHMEM_TLS");
     if (NULL != tls) {
         return check_mxm_tls("MXM_OSHMEM_TLS");
@@ -258,6 +264,8 @@ static int mca_spml_ikrit_component_open(void)
                     (cur_ver >> MXM_MINOR_BIT) & 0xff);
     }
 
+    mca_spml_ikrit.mxm_mq = NULL;
+    mca_spml_ikrit.mxm_context = NULL;
     mca_spml_ikrit.ud_only = 0;
 #if MXM_API < MXM_VERSION(2,1)
     mca_spml_ikrit.hw_rdma_channel = 0;
@@ -317,6 +325,9 @@ static int mca_spml_ikrit_component_open(void)
 
 static int mca_spml_ikrit_component_close(void)
 {
+    if (mca_spml_ikrit.mxm_mq) {
+        mxm_mq_destroy(mca_spml_ikrit.mxm_mq);
+    }
     if (mca_spml_ikrit.mxm_context) {
         mxm_cleanup(mca_spml_ikrit.mxm_context);
 #if MXM_API < MXM_VERSION(2,0)
@@ -330,6 +341,7 @@ static int mca_spml_ikrit_component_close(void)
         }
 #endif
     }
+    mca_spml_ikrit.mxm_mq = NULL;
     mca_spml_ikrit.mxm_context = NULL;
     return OSHMEM_SUCCESS;
 }

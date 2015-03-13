@@ -15,6 +15,8 @@
 # Copyright (c) 2006-2007 Los Alamos National Security, LLC.  All rights
 #                         reserved. 
 # Copyright (c) 2009      Oak Ridge National Labs.  All rights reserved.
+# Copyright (c) 2014      Research Organization for Information Science
+#                         and Technology (RIST). All rights reserved.
 # $COPYRIGHT$
 # 
 # Additional copyrights may follow
@@ -426,6 +428,16 @@ AC_DEFUN([OMPI_SETUP_MPI_FORTRAN],[
                [OMPI_FORTRAN_HAVE_OPTIONAL_ARGS=0
                 OMPI_BUILD_FORTRAN_USEMPIF08_BINDINGS=0])])
 
+    OMPI_FORTRAN_HAVE_C_FUNLOC=0
+    AS_IF([test $OMPI_WANT_FORTRAN_USEMPIF08_BINDINGS -eq 1 -a \
+           $OMPI_BUILD_FORTRAN_USEMPIF08_BINDINGS -eq 1],
+          [ # Does the compiler supports c_funloc per
+            # TS 29113 subclause 8.1 ?
+           OMPI_FORTRAN_CHECK_C_FUNLOC(
+               [OMPI_FORTRAN_HAVE_C_FUNLOC=1],
+               [OMPI_FORTRAN_HAVE_C_FUNLOC=0
+                OMPI_BUILD_FORTRAN_USEMPIF08_BINDINGS=0])])
+
     OMPI_FORTRAN_HAVE_PRIVATE=0
     AS_IF([test $OMPI_WANT_FORTRAN_USEMPIF08_BINDINGS -eq 1 -a \
            $OMPI_BUILD_FORTRAN_USEMPIF08_BINDINGS -eq 1],
@@ -645,6 +657,22 @@ end type test_mpi_handle],
                    [test $OMPI_BUILD_FORTRAN_USEMPI_BINDINGS -eq 1 -a \
                          $OMPI_FORTRAN_HAVE_IGNORE_TKR -eq 1])
 
+    # A dummy library is built for ABI reasons in v1.8.4 and beyond.
+    # See ompi/mpi/fortran/README-v1.8-ABI.txt for details.
+
+    # NOTE: we are checking the *C* compiler vendor, not the *Fortran*
+    # compiler vendor.  This is because we don't have a good way to
+    # test for the fortran compiler vendor. :-( However, it's probably
+    # "good enough" to check the C compiler vendor because it's
+    # actually safe to *always* build this dummy library when we're
+    # building the ignore-tkr mpi module; it just isn't *needed* to
+    # fix ABI issues unless we're gfortran >= 4.9 (which will only be
+    # true if we're building the ignore-tkr mpi module and the Fortran
+    # compiler is gfortran).  So it's imprecise, but harmless.
+    AM_CONDITIONAL(OMPI_BUILD_FORTRAN_DUMMY_MPI_MODULE_LIBRARY,
+                   [test $OMPI_FORTRAN_HAVE_IGNORE_TKR -eq 1 && \
+                    test "$ompi_c_vendor" = "gnu"])
+
     # -------------------
     # use mpi_f08 final setup
     # -------------------
@@ -741,6 +769,13 @@ end type test_mpi_handle],
     AC_DEFINE_UNQUOTED([OMPI_FORTRAN_HAVE_PROCEDURE], 
                        [$OMPI_FORTRAN_HAVE_PROCEDURE],
                        [For ompi/mpi/fortran/use-mpi-f08/blah.F90 and blah.h and ompi_info: whether the compiler supports the "procedure" keyword or not])
+
+    # For configure-fortran-output.h, various files in
+    # ompi/mpi/fortran/use-mpi-f08/*.F90 and *.h files (and ompi_info)
+    AC_SUBST([OMPI_FORTRAN_HAVE_C_FUNLOC])
+    AC_DEFINE_UNQUOTED([OMPI_FORTRAN_HAVE_C_FUNLOC], 
+                       [$OMPI_FORTRAN_HAVE_C_FUNLOC],
+                       [For ompi/mpi/fortran/use-mpi-f08/blah.F90 and blah.h and ompi_info: whether the compiler supports c_funloc or not])
 
     # For configure-fortran-output.h
     AC_SUBST(OMPI_FORTRAN_HAVE_BIND_C)

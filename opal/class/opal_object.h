@@ -1,3 +1,4 @@
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil -*- */
 /*
  * Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
@@ -12,6 +13,8 @@
  * Copyright (c) 2007-2014 Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2014      Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
+ * Copyright (c) 2015      Los Alamos National Security, LLC. All rights
+ *                         reserved.
  * $COPYRIGHT$
  * 
  * Additional copyrights may follow
@@ -124,9 +127,7 @@
 #include <stdlib.h>
 #endif  /* HAVE_STDLIB_H */
 
-#if OPAL_ENABLE_MULTI_THREADS
-#include "opal/sys/atomic.h"
-#endif  /* OPAL_ENABLE_MULTI_THREADS */
+#include "opal/threads/thread_usage.h"
 
 BEGIN_C_DECLS
 
@@ -498,15 +499,9 @@ static inline opal_object_t *opal_obj_new(opal_class_t * cls)
 static inline int opal_obj_update(opal_object_t *object, int inc) __opal_attribute_always_inline__;
 static inline int opal_obj_update(opal_object_t *object, int inc)
 {
-#if OPAL_ENABLE_MULTI_THREADS
-    return opal_atomic_add_32(&(object->obj_reference_count), inc );
-#else
-    object->obj_reference_count += inc;
-    return object->obj_reference_count;
-#endif
+    return OPAL_THREAD_ADD32(&object->obj_reference_count, inc);
 }
 
 END_C_DECLS
 
 #endif
-

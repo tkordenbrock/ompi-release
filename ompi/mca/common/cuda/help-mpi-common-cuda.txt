@@ -42,12 +42,6 @@ The call to cuMemHostRegister(%p, %d, 0) failed.
   cuMemHostRegister return value:  %d
   Memory Pool:  %s
 #
-[cuMemHostUnregister failed]
-The call to cuMemHostUnregister(%p) failed.
-  Host:  %s
-  cuMemHostUnregister return value:  %d
-  Memory Pool:  %s
-#
 [cuIpcGetMemHandle failed]
 The call to cuIpcGetMemHandle failed. This means the GPU RDMA protocol
 cannot be used.
@@ -82,10 +76,12 @@ of the node will clear the problem.
 [cuIpcCloseMemHandle failed]
 The call to cuIpcCloseMemHandle failed. This is a warning and the program 
 will continue to run.
-  cuIpcOpenMemHandle return value:   %d
-  address: %p
-Check the cuda.h file for what the return value means. Perhaps a reboot
-of the node will clear the problem.
+  Hostname:                         %s
+  cuIpcOpenMemHandle return value:  %d
+  address:                          %p
+Check the cuda.h file for what the return value means. A possible cause
+for this is not enough free device memory.  Try to reduce the device
+memory footprint of your application.
 #
 [cuMemcpyAsync failed]
 The call to cuMemcpyAsync failed. This is a unrecoverable error and will

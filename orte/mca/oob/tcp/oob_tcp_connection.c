@@ -56,6 +56,7 @@
 #include "opal/mca/sec/sec.h"
 #include "opal/util/output.h"
 #include "opal/util/net.h"
+#include "opal/util/fd.h"
 #include "opal/util/error.h"
 #include "opal/class/opal_hash_table.h"
 #include "opal/mca/event/event.h"
@@ -96,6 +97,14 @@ static int tcp_peer_create_socket(mca_oob_tcp_peer_t* peer)
                          ORTE_NAME_PRINT(&(peer->name))));
     
     peer->sd = socket(AF_INET, SOCK_STREAM, 0);
+    /* Set this fd to be close-on-exec so that any subsequent children don't see it */
+    if (opal_fd_set_cloexec(peer->sd) != OPAL_SUCCESS) {
+        opal_output(0, "%s unable to set socket to CLOEXEC",
+                    ORTE_NAME_PRINT(ORTE_PROC_MY_NAME));
+        close(peer->sd);
+        peer->sd = -1;
+        return ORTE_ERROR;
+    }
 
     if (peer->sd < 0) {
         opal_output(0, "%s-%s tcp_peer_create_socket: socket() failed: %s (%d)\n",
@@ -149,7 +158,7 @@ void mca_oob_tcp_peer_try_connect(int fd, short args, void *cbdata)
     char *host;
     mca_oob_tcp_send_t *snd;
     bool connected = false;
-
+    
     opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
                         "%s orte_tcp_peer_try_connect: "
                         "attempting to connect to proc %s",
@@ -225,10 +234,10 @@ void mca_oob_tcp_peer_try_connect(int fd, short args, void *cbdata)
             }
 
             /* Some kernels (Linux 2.6) will automatically software
-               abort a connection that was ECONNREFUSED on the last
-               attempt, without even trying to establish the
-               connection.  Handle that case in a semi-rational
-               way by trying twice before giving up */
+             * abort a connection that was ECONNREFUSED on the last
+             * attempt, without even trying to establish the
+             * connection.  Handle that case in a semi-rational
+             * way by trying twice before giving up */
             if (ECONNABORTED == opal_socket_errno) {
                 if (addr->retries < mca_oob_tcp_component.max_retries) {
                     opal_output_verbose(OOB_TCP_DEBUG_CONNECT, orte_oob_base_framework.framework_output,
@@ -238,8 +247,7 @@ void mca_oob_tcp_peer_try_connect(int fd, short args, void *cbdata)
                     goto retry_connect;
                 } else {
                     /* We were unsuccessful in establishing this connection, and are
-                     * not likely to suddenly become successful, so rotate to next option
-                     */
+                     * not likely to suddenly become successful, so rotate to next option */
                     addr->state = MCA_OOB_TCP_FAILED;
                     continue;
                 }

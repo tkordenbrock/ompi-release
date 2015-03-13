@@ -324,7 +324,7 @@ static int mca_btl_base_vader_modex_send (void)
         modex.xpmem.seg_id = mca_btl_vader_component.my_seg_id;
         modex.xpmem.segment_base = mca_btl_vader_component.my_segment;
 
-        modex_size = sizeof (modex);
+        modex_size = sizeof (modex.xpmem);
     } else {
 #endif
         /* need to pack the modex data in 1.8 since seg_name is not at the end of the stuct */
@@ -373,22 +373,21 @@ static void mca_btl_vader_check_single_copy (void)
             mca_btl_vader_select_next_single_copy_mechanism ();
         } else {
             mca_btl_vader.super.btl_get = mca_btl_vader_get_xpmem;
-            mca_btl_vader.super.btl_put = mca_btl_vader_get_xpmem;
+            mca_btl_vader.super.btl_put = mca_btl_vader_put_xpmem;
         }
-
     }
 #endif
 
 #if OMPI_BTL_VADER_HAVE_CMA
     if (MCA_BTL_VADER_CMA == mca_btl_vader_component.single_copy_mechanism) {
         /* Check if we have the proper permissions for CMA */
-        char buffer = {0};
+        char buffer = '0';
         bool cma_happy = false;
         int fd;
 
         /* check system setting for current ptrace scope */
         fd = open ("/proc/sys/kernel/yama/ptrace_scope", O_RDONLY);
-        if (0 > fd) {
+        if (0 < fd) {
             read (fd, &buffer, 1);
             close (fd);
         }

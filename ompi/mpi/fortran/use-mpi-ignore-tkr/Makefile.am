@@ -1,6 +1,8 @@
 # -*- makefile -*-
 #
 # Copyright (c) 2006-2014 Cisco Systems, Inc.  All rights reserved.
+# Copyright (c) 2015      Research Organization for Information Science
+#                         and Technology (RIST). All rights reserved.
 #
 # $COPYRIGHT$
 # 
@@ -22,6 +24,24 @@ AM_FCFLAGS = -I$(top_builddir)/ompi/include -I$(top_srcdir)/ompi/include \
 
 lib_LTLIBRARIES = libmpi_usempi_ignore_tkr.la
 
+#
+# This library is built for ABI reasons in v1.8.4 and beyond.  See
+# ompi/mpi/fortran/README-v1.8-ABI.txt for details.
+#
+if OMPI_BUILD_FORTRAN_DUMMY_MPI_MODULE_LIBRARY
+lib_LTLIBRARIES += libmpi_usempi.la
+endif OMPI_BUILD_FORTRAN_DUMMY_MPI_MODULE_LIBRARY
+
+# Make the dummy library link against the real library so that it
+# implicitly pulls it in (since old apps compiled against the old
+# library name will not automatically pull in the new library).
+libmpi_usempi_la_SOURCES = usempi-dummy.c
+libmpi_usempi_la_DEPENDENCIES = libmpi_usempi_ignore_tkr.la
+libmpi_usempi_la_LIBADD = libmpi_usempi_ignore_tkr.la
+libmpi_usempi_la_LDFLAGS = \
+        -version-info $(libmpi_usempi_tkr_so_version) \
+        $(OMPI_FORTRAN_EXTRA_SHARED_LIBRARY_FLAGS)
+
 mpi-ignore-tkr-interfaces.h: mpi-ignore-tkr-interfaces.h.in
 mpi-ignore-tkr-file-interfaces.h: mpi-ignore-tkr-file-interfaces.h.in
 
@@ -34,6 +54,7 @@ mpi-ignore-tkr.lo: mpi-ignore-tkr-sizeof.f90
 mpi-ignore-tkr.lo: mpi-ignore-tkr.F90
 
 libmpi_usempi_ignore_tkr_la_SOURCES = \
+        gratuitious-symbol.c \
         mpi-ignore-tkr.F90
 nodist_libmpi_usempi_ignore_tkr_la_SOURCES = \
         mpi-ignore-tkr-interfaces.h \
@@ -45,6 +66,10 @@ nodist_libmpi_usempi_ignore_tkr_la_SOURCES += \
         mpi-ignore-tkr-sizeof.h \
         mpi-ignore-tkr-sizeof.f90
 endif
+
+libmpi_usempi_ignore_tkr_la_LDFLAGS = \
+        -version-info $(libmpi_usempi_ignore_tkr_so_version) \
+        $(OMPI_FORTRAN_EXTRA_SHARED_LIBRARY_FLAGS)
 
 #
 # mpi-ignore-tkr-sizeof.* are generated based on some results from
@@ -59,7 +84,9 @@ mpi-ignore-tkr-sizeof.h:
 	$(OMPI_V_GEN) $(sizeof_pl) \
 	    --header=$@ --ierror=mandatory \
 	    --maxrank=$(OMPI_FORTRAN_MAX_ARRAY_RANK) \
-	    --generate=$(OMPI_FORTRAN_BUILD_SIZEOF)
+	    --generate=$(OMPI_FORTRAN_BUILD_SIZEOF) \
+	    --real16=$(OMPI_HAVE_FORTRAN_REAL16) \
+	    --complex32=$(OMPI_HAVE_FORTRAN_COMPLEX32)
 
 mpi-ignore-tkr-sizeof.f90: $(top_builddir)/config.status
 mpi-ignore-tkr-sizeof.f90: $(sizeof_pl)
@@ -67,7 +94,9 @@ mpi-ignore-tkr-sizeof.f90:
 	$(OMPI_V_GEN) $(sizeof_pl) \
 	    --impl=$@ --ierror=mandatory --mpi --pmpi \
 	    --maxrank=$(OMPI_FORTRAN_MAX_ARRAY_RANK) \
-	    --generate=$(OMPI_FORTRAN_BUILD_SIZEOF)
+	    --generate=$(OMPI_FORTRAN_BUILD_SIZEOF) \
+	    --real16=$(OMPI_HAVE_FORTRAN_REAL16) \
+	    --complex32=$(OMPI_HAVE_FORTRAN_COMPLEX32)
 
 #
 # Clean up generated and module files
