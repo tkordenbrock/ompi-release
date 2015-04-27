@@ -469,43 +469,8 @@ OPAL_VAR_SCOPE_POP
 # Check for other compiler characteristics
 #
 
-OPAL_VAR_SCOPE_PUSH([CFLAGS_save])
-if test "$GCC" = "yes"; then
-
-    # gcc 2.96 will emit oodles of warnings if you use "inline" with
-    # -pedantic (which we do in developer builds).  However,
-    # "__inline__" is ok.  So we have to force gcc to select the
-    # right one.  If you use -pedantic, the AC_C_INLINE test will fail
-    # (because it names a function foo() -- without the (void)).  So
-    # we turn off all the picky flags, turn on -ansi mode (which is
-    # implied by -pedantic), and set warnings to be errors.  Hence,
-    # this does the following (for 2.96):
-    #
-    # - causes the check for "inline" to emit a warning, which then
-    # fails
-    # - checks for __inline__, which then emits no error, and works
-    #
-    # This also works nicely for gcc 3.x because "inline" will work on
-    # the first check, and all is fine.  :-)
-
-    CFLAGS_save=$CFLAGS
-    CFLAGS="$OMPI_CFLAGS_BEFORE_PICKY -Werror -ansi"
-fi
-AC_C_INLINE
-# Microsoft compilers support 2 versions of restrict. One for functions, and
-# one for variables. The problem is that they don't have an equivalent
-# syntax, and the autoconf restrict detection is unable to detect them
-# correctly. It detect the restrict keyword as __restrict which break the
-# rules for function syntax which is declspec(restrict).
-if test "x$ompi_cv_c_compiler_vendor" != "xmicrosoft"; then
-    AC_C_RESTRICT
-fi
 OMPI_C_WEAK_SYMBOLS
 OMPI_C_MACRO_WEAK_SYMBOLS
-if test "$GCC" = "yes"; then
-    CFLAGS=$CFLAGS_save
-fi
-OPAL_VAR_SCOPE_POP
 
 if test "x$CC" = "xicc"; then
     OMPI_CHECK_ICC_VARARGS
@@ -825,6 +790,33 @@ m4_ifdef([project_ompi], [OMPI_FIND_MPI_AINT_COUNT_OFFSET])
 # checkpoint results
 AC_CACHE_SAVE
 
+##################################
+# Linker characteristics
+##################################
+
+AC_MSG_CHECKING([the linker for support for the -fini option])
+OPAL_VAR_SCOPE_PUSH([LDFLAGS_save])
+LDFLAGS_save=$LDFLAGS
+LDFLAGS="$LDFLAGS_save -Wl,-fini -Wl,finalize"
+AC_TRY_LINK([void finalize (void) {}], [], [AC_MSG_RESULT([yes])
+        opal_ld_have_fini=1], [AC_MSG_RESULT([no])
+        opal_ld_have_fini=0])
+LDFLAGS=$LDFLAGS_save
+OPAL_VAR_SCOPE_POP
+
+opal_destructor_use_fini=0
+opal_no_destructor=0
+if test x$opal_cv___attribute__destructor = x0 ; then
+    if test x$opal_ld_have_fini = x1 ; then
+        opal_destructor_use_fini=1
+    else
+        opal_no_destructor=1;
+    fi
+fi
+
+AC_DEFINE_UNQUOTED(OPAL_NO_LIB_DESTRUCTOR, [$opal_no_destructor],
+    [Whether libraries can be configured with destructor functions])
+AM_CONDITIONAL(OPAL_DESTRUCTOR_USE_FINI, [test x$opal_destructor_use_fini = x1])
 
 ##################################
 # Libraries
@@ -1122,6 +1114,18 @@ m4_ifdef([project_ompi], [OMPI_REQUIRE_ENDPOINT_TAG_FINI])
 AC_CACHE_SAVE
 
 ##################################
+# CUDA: part two
+##################################
+
+# This is somewhat gross to have a configure check for a common MCA
+# component outside of the normal MCA checks, but this check must come
+# after the opal DL MCA checks have done.  Someday this could perhaps
+# be done better by having some kind of "run this check at the end of
+# all other MCA checks" hook...?
+
+OPAL_CHECK_CUDA_AFTER_OPAL_DL
+
+##################################
 # MPI Extended Interfaces
 ##################################
 
@@ -1182,8 +1186,6 @@ fi
 # a C++ compiler.
 AS_IF([test "$OMPI_WANT_FORTRAN_BINDINGS" != "1"],[F77=no FC=no])
 
-LT_CONFIG_LTDL_DIR([opal/libltdl], [subproject])
-LTDL_CONVENIENCE
 LT_INIT([dlopen win32-dll])
 
 # What's the suffix of shared libraries?  Inspired by generated
@@ -1219,8 +1221,6 @@ hpux9* | hpux10* | hpux11*)
 esac
 AC_SUBST(OPAL_DYN_LIB_PREFIX)
 AC_SUBST(OPAL_DYN_LIB_SUFFIX)
-
-OPAL_SETUP_LIBLTDL
 
 # Need the libtool binary before the rpathify stuff
 LT_OUTPUT
